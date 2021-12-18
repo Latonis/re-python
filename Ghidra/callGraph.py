@@ -3,7 +3,7 @@ import ghidra_bridge
 def getAddress(indx):
 	return currentProgram.getAddressFactory().getAddress(indx)
 
-with ghidra_bridge.GhidraBridge(namespace=globals()):
+with ghidra_bridge.GhidraBridge(namespace=globals(), hook_import=True):
 	print(getState().getCurrentAddress().getOffset())
 
 	listing = currentProgram.getListing()
@@ -16,24 +16,27 @@ with ghidra_bridge.GhidraBridge(namespace=globals()):
 		
 	import networkx as nx
 	import matplotlib.pyplot as plt
+	import numpy as np
+	from ghidra.util.task import TaskMonitor
 
-	graph = nx.DiGraph()
+	graph = nx.Graph()
 	for func in functions:
-		entryPoint = func.getEntryPoint()
-		name = func.getName()
-		instructions = listing.getInstructions(entryPoint, True)
-		print(f"Function: {name}, Entry Point: {entryPoint}")
+		print(f"Function Name: {func.getName()}")
+		print(f"Function Body: {func.getBody()}")
+		print(f"Function Entry Point: {func.getEntryPoint()} ")
 
-		for instr in instructions:
-			address = instr.getAddress()
-			opcode = instr.getMnemonicString()
-			if opcode == "CALL":
-				print(f"\t 0x{address}: {instr}")
-				flows = instr.getFlows()
-				if (len(flows)) == 1:
-					targetAddress = f"{flows[0]}" if "EXTERNAL" in str(flows[0]) else f"0x{flows[0]}"
-					targetFunc =  targetAddress if "EXTERNAL" in targetAddress else functionManager.getFunctionAt(getAddress(targetAddress)).getName()
-					graph.add_edge(name, targetFunc)
-	nx.draw(graph, with_labels=True)
+		print(f"Function Called by: {func.getCalledFunctions(TaskMonitor.DUMMY)}")
+		graph.add_edges_from([(func.getName(), x.getName()) for x in func.getCalledFunctions(TaskMonitor.DUMMY)])
+		# print(f"Function Calling: {func.getCallingFunctions(TaskMonitor.DUMMY)}")
+		# entryPoint = func.getEntryPoint()
+		# name = func.getName()
+		# instructions = listing.getInstructions(entryPoint, True)
+		# print(f"Function: {name}, Entry Point: {entryPoint}")
+		# graph.add_edge(name, targetFunc)
+	pos = nx.spring_layout(graph, k=0.3*1/np.sqrt(len(graph.nodes())), iterations=20)
+	nx.draw_planar(graph, with_labels=True, verticalalignment='top')
+	# nx.draw(graph, pos=pos, )
+	# nx.draw_networkx_nodes(graph, pos=pos, node_size=600, node_color='w', alpha=0.4, node_shape='d')
+	# nx.draw_networkx_labels(graph, pos=pos)
 	plt.show()
 
